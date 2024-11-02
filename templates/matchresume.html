@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Matcher</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            margin-top: 50px;
+            margin-bottom: 50px;
+        }
+        .card {
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #1E2A5E; /* Updated header color */
+            color: white;
+            border-radius: 10px 10px 0 0;
+            padding: 10px 20px;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .skills-badge {
+            margin: 2px;
+            font-size: 0.9em;
+            background-color: #7C93C3; /* Skills color */
+            color: white; /* Ensuring text is readable on skills background */
+        }
+        .resume-item {
+            border-bottom: 1px solid #4F75FF;
+            padding: 10px 0;
+        }
+        .resume-item:last-child {
+            border-bottom: none;
+        }
+        .nav-tabs {
+            margin-bottom: 20px;
+        }
+        .match-btn, .export-btn {
+            margin-top: 20px;
+            background-color: #1E2A5E; /* Match resumes button color */
+            color: white;
+        }
+        .match-btn:hover, .export-btn:hover {
+            background-color: #4B6B9A; /* Lighter hover color */
+            color: white; /* Keep text color white on hover */
+        }
+        .rankings-header, .top10-header {
+            color: #1E2A5E; /* Header color matches button color */
+        }
+        button {
+            background-color: #55679C; /* Button color */
+            color: white;
+        }
+        button:hover {
+            background-color: #7C93C3; /* Hover color */
+        }
+        .collapse {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body onload="clearForm()">
+    <div class="container">
+        <div class="card">
+            <div class="card-header text-center">
+                <h2> HireStream Resume Screening</h2>
+            </div>
+            <div class="card-body">
+                <form id="resumeForm" method="POST" action="/matcher" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="job_description">Job Description:</label>
+                        <textarea class="form-control" id="job_description" name="job_description" rows="5" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="resumes">Upload Resumes:</label>
+                        <p>Please Upload Resumes (PDF, DOCX, or TXT format)</p>
+                        <input type="file" class="form-control" id="resumes" name="resumes" multiple required accept=".pdf, .docx, .txt">
+                    </div>
+                    <button type="submit" class="btn match-btn">Match Resumes</button> <!-- Updated button -->
+                </form>
+
+                {% if ranked_resumes %}
+                    <div class="mt-4">
+                        <ul class="nav nav-tabs" id="resultTabs" role="tablist">
+                            <li class="nav-item">
+                                <a class="nav-link active" id="rankings-tab" data-toggle="tab" href="#rankings" role="tab">Rankings</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="top10-tab" data-toggle="tab" href="#top10" role="tab">Top 10 Applications</a>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <!-- Rankings Tab -->
+                            <div class="tab-pane fade show active" id="rankings" role="tabpanel">
+                                <h4 class="rankings-header" style="color: #1E2A5E;">All Rankings</h4> <!-- Updated header color -->
+                                {% for resume in ranked_resumes %}
+                                    <div class="resume-item">
+                                        <h5>Rank {{ resume.rank }}: {{ resume.filename }}</h5>
+                                        <p>Similarity Score: {{ resume.score }}%</p>
+                                        <button class="btn btn-sm btn-info" type="button" data-toggle="collapse"
+                                                data-target="#skills{{ resume.rank }}">
+                                            View Skills
+                                        </button>
+                                        <div class="collapse mt-2" id="skills{{ resume.rank }}">
+                                            {% for skill in resume.skills %}
+                                                <span class="badge skills-badge">{{ skill }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Top 10 Tab -->
+                            <div class="tab-pane fade" id="top10" role="tabpanel">
+                                <h4 class="top10-header" style="color: #1E2A5E;">Top 10 Applications</h4> <!-- Updated header color -->
+                                {% for resume in top_10 %}
+                                    <div class="resume-item">
+                                        <h5>Rank #{{ resume.rank }}: {{ resume.filename }}</h5>
+                                        <p>Similarity Score: {{ resume.score }}%</p>
+                                        <button class="btn btn-sm btn-info" type="button" data-toggle="collapse"
+                                                data-target="#skillsTop{{ resume.rank }}">
+                                            View Skills
+                                        </button>
+                                        <div class="collapse mt-2" id="skillsTop{{ resume.rank }}">
+                                            {% for skill in resume.skills %}
+                                                <span class="badge skills-badge">{{ skill }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                                <button class="btn export-btn" onclick="exportToExcel()">Export as Excel Sheet</button> <!-- Updated button -->
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if message and not ranked_resumes %}
+                    <div class="alert alert-info mt-4">
+                        <p>{{ message }}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        function clearForm() {
+            document.getElementById("resumeForm").reset();
+        }
+
+        document.getElementById("resumeForm").onsubmit = function() {
+            setTimeout(clearForm, 500);
+        };
+
+        function exportToExcel() {
+            const top10Data = {{ top_10|tojson|safe if top_10 else '[]' }};
+
+            fetch('/export_excel', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    resumes: top10Data
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                window.location.href = '/download_excel/' + data.file_path.split('/').pop();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error exporting to Excel');
+            });
+        }
+    </script>
+</body>
+</html>
+
